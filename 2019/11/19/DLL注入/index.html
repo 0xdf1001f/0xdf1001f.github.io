@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+    <meta name="keywords" content="业余，逆向，C，脚本，病毒，摸鱼，划水，APT，漏洞，攻击">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    DLL远线程注入 |
+    
+    Y</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+    <link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+  
+  <script src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  
+
+<article id="post-DLL注入" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+  
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      DLL远线程注入
+    </h1>
+  
+  
+
+
+
+
+      </header>
+    
+
+    
+      <div class="article-meta">
+        <a href="/2019/11/19/DLL%E6%B3%A8%E5%85%A5/" class="article-date">
+  <time datetime="2019-11-19T07:01:04.000Z" itemprop="datePublished">2019-11-19</time>
+</a>
+        
+      </div>
+    
+
+    
+      
+
+
+
+
+    
+
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+        <p>Main.cpp</p>
+<a id="more"></a>
+
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">1.</span> <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;  </span></span></span><br><span class="line"><span class="number">2.</span> <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;tchar.h&gt;  </span></span></span><br><span class="line"><span class="number">3.</span> <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;Windows.h&gt;  </span></span></span><br><span class="line"><span class="number">4.</span> <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;process.h&gt;  </span></span></span><br><span class="line"><span class="number">5.</span> </span><br><span class="line"><span class="number">6.</span> <span class="function"><span class="keyword">void</span> <span class="title">main</span><span class="params">()</span>  </span></span><br><span class="line">7. &#123;  </span><br><span class="line"><span class="number">8.</span>     DWORD pid;  </span><br><span class="line"><span class="number">9.</span>     HWND proc = FindWindow(<span class="literal">NULL</span>,<span class="string">"HACKAV练习-000"</span>);    <span class="comment">//从进程窗口名获取进程句柄  </span></span><br><span class="line"><span class="number">10.</span>     <span class="keyword">if</span> (proc == <span class="literal">NULL</span>)  </span><br><span class="line"><span class="number">11.</span>         <span class="built_in">printf</span> (<span class="string">"Find Window fail\n"</span>);  </span><br><span class="line"><span class="number">12.</span>     GetWindowThreadProcessId (proc,&amp;pid);     <span class="comment">//从句柄得到进程PID  </span></span><br><span class="line"><span class="number">13.</span>     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, <span class="literal">NULL</span>, pid);    <span class="comment">//打开进程获取权限  </span></span><br><span class="line"><span class="number">14.</span>     <span class="keyword">if</span>(hProcess == <span class="literal">NULL</span>)  </span><br><span class="line"><span class="number">15.</span>         <span class="built_in">printf</span> (<span class="string">"open process wrong!\n"</span>);  </span><br><span class="line"><span class="number">16.</span>     LPVOID lpAddr = VirtualAllocEx(hProcess,<span class="literal">NULL</span>,<span class="number">0x1000</span>,MEM_COMMIT,PAGE_EXECUTE_READWRITE);  <span class="comment">//申请内存  </span></span><br><span class="line"><span class="number">17.</span>     <span class="keyword">if</span>(lpAddr == <span class="literal">NULL</span>)  </span><br><span class="line"><span class="number">18.</span>         <span class="built_in">printf</span> (<span class="string">"VirtualAlloc fail"</span>);  </span><br><span class="line"><span class="number">19.</span>   </span><br><span class="line"><span class="number">20.</span>     <span class="comment">//拼接出dll路径  </span></span><br><span class="line"><span class="number">21.</span>     <span class="keyword">char</span> szBuf[MAX_PATH]=&#123;<span class="literal">NULL</span>&#125;;  </span><br><span class="line"><span class="number">22.</span>     GetCurrentDirectory(<span class="keyword">sizeof</span>(szBuf),szBuf);        </span><br><span class="line"><span class="number">23.</span>     <span class="built_in">strcat</span>(szBuf,<span class="string">"\\Inject Dll.dll"</span>);  </span><br><span class="line"><span class="number">24.</span>     <span class="built_in">printf</span> (<span class="string">"%s\n"</span>,szBuf);  </span><br><span class="line"><span class="number">25.</span>       </span><br><span class="line"><span class="number">26.</span>     <span class="comment">//将DLL路径写入进程  </span></span><br><span class="line"><span class="number">27.</span>     <span class="keyword">bool</span> <span class="built_in">write</span> = WriteProcessMemory (hProcess,lpAddr,szBuf,<span class="built_in">strlen</span> (szBuf)+<span class="number">1</span>,<span class="literal">NULL</span>);  </span><br><span class="line"><span class="number">28.</span>     <span class="keyword">if</span>(!<span class="built_in">write</span>)  </span><br><span class="line"><span class="number">29.</span>         <span class="built_in">printf</span> (<span class="string">"write process memory fail\n"</span>);  </span><br><span class="line"><span class="number">30.</span>   </span><br><span class="line"><span class="number">31.</span>     <span class="comment">//开辟新线程，调用loadlibrary加载  </span></span><br><span class="line"><span class="number">32.</span>     HANDLE hThreadHandle = CreateRemoteThread (hProcess,<span class="literal">NULL</span>,<span class="number">0</span>,(LPTHREAD_START_ROUTINE)LoadLibrary,lpAddr,<span class="number">0</span>,<span class="literal">NULL</span>);  </span><br><span class="line"><span class="number">33.</span>   </span><br><span class="line"><span class="number">34.</span>   </span><br><span class="line"><span class="number">35.</span>     system (<span class="string">"pause"</span>);  </span><br><span class="line"><span class="number">36.</span> &#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>Inject Dll.dll:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">37.</span> <span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">"stdafx.h"</span>  </span></span><br><span class="line"><span class="number">38.</span>   </span><br><span class="line"><span class="number">39.</span> <span class="function">BOOL APIENTRY <span class="title">DllMain</span><span class="params">( HMODULE hModule,  </span></span></span><br><span class="line"><span class="function"><span class="params"><span class="number">40.</span>                       DWORD  ul_reason_for_call,  </span></span></span><br><span class="line"><span class="function"><span class="params"><span class="number">41.</span>                       LPVOID lpReserved  </span></span></span><br><span class="line"><span class="function"><span class="params"><span class="number">42.</span>                       )</span>  </span></span><br><span class="line">43. &#123;  </span><br><span class="line"><span class="number">44.</span>     <span class="keyword">switch</span> (ul_reason_for_call)  </span><br><span class="line"><span class="number">45.</span>     &#123;  </span><br><span class="line"><span class="number">46.</span>     <span class="keyword">case</span> DLL_PROCESS_ATTACH:  </span><br><span class="line"><span class="number">47.</span>         MessageBox(<span class="literal">NULL</span>, TEXT(<span class="string">"Inject success!"</span>), TEXT(<span class="string">"Inject"</span>), MB_OK);  </span><br><span class="line"><span class="number">48.</span>     <span class="keyword">case</span> DLL_THREAD_ATTACH:  </span><br><span class="line"><span class="number">49.</span>     <span class="keyword">case</span> DLL_THREAD_DETACH:  </span><br><span class="line"><span class="number">50.</span>     <span class="keyword">case</span> DLL_PROCESS_DETACH:  </span><br><span class="line"><span class="number">51.</span>         <span class="keyword">break</span>;  </span><br><span class="line"><span class="number">52.</span>     &#125;  </span><br><span class="line"><span class="number">53.</span>     <span class="keyword">return</span> TRUE;  </span><br><span class="line"><span class="number">54.</span> &#125;</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/11/19/DLL%E6%B3%A8%E5%85%A5/" data-id="ck4fawyyq0004k0u6cb1khjwk"
+         class="article-share-link">Share</a>
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/DLL/" rel="tag">DLL</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%B3%A8%E5%85%A5/" rel="tag">注入</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%BF%9C%E7%BA%BF%E7%A8%8B/" rel="tag">远线程</a></li></ul>
+
+    </footer>
+
+  </div>
+
+  
+    
+  <nav class="article-nav">
+    
+      <a href="/2019/11/19/%E8%BE%93%E5%85%A5%E6%B3%95%E6%B3%A8%E5%85%A5/" class="article-nav-link">
+        <strong class="article-nav-caption">Newer posts</strong>
+        <div class="article-nav-title">
+          
+            输入法注入
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2019/11/19/IAT%E5%8A%A0%E5%AF%86%E5%A3%B3%E8%84%B1%E5%A3%B3/" class="article-nav-link">
+        <strong class="article-nav-caption">Olde posts</strong>
+        <div class="article-nav-title">IAT加密壳脱壳</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+    
+  
+
+</article>
+
+
+
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+</ul>
+    </div>
+    <ul class="list-inline">
+      <li>&copy; 2019 Y</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean">Ocean</a></li>
+    </ul>
+  </div>
+</footer>
+
+</main>
+
+<aside class="sidebar sidebar-specter">
+  
+    <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/hexo.svg" alt="Y"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">Home</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">Archives</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/gallery">Gallery</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">About</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="Search">
+        <i class="fe fe-search"></i>
+        Search
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+  </aside>
+  <script src="/js/jquery-2.0.3.min.js"></script>
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/lazyload.min.js"></script>
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+  <script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+  <script src="/js/tocbot.min.js"></script>
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+<script src="/js/ocean.js"></script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/hijiki.model.json"},"display":{"position":"left","width":150,"height":300},"mobile":{"show":true},"log":false});</script></body>
+</html>

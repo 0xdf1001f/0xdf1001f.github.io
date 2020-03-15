@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+    <meta name="keywords" content="业余，逆向，C，脚本，病毒，摸鱼，划水，APT，漏洞，攻击">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    PESpin脱壳 |
+    
+    Y</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+    <link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+  
+  <script src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  
+
+<article id="post-PESpin脱壳" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+  
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      PESpin脱壳
+    </h1>
+  
+  
+
+
+
+
+      </header>
+    
+
+    
+      <div class="article-meta">
+        <a href="/2019/12/05/PESpin%E8%84%B1%E5%A3%B3/" class="article-date">
+  <time datetime="2019-12-05T12:32:36.000Z" itemprop="datePublished">2019-12-05</time>
+</a>
+        
+      </div>
+    
+
+    
+      
+
+
+
+
+    
+
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+        <p>拉进DIE查壳，PESpin</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9m4mhmcx7j30g109g0td.jpg" alt></p>
+<a id="more"></a>
+
+<p>拖进OD后，如图</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9m4nvxcfmj31hc0ohacu.jpg" alt></p>
+<p>F8后，来到 pushad，在pushad下用ESP定律，下硬断，然后F9跑飞了</p>
+<p>硬断没有断下，在OD中，取消勾选忽略异常</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9m4vpx532j30d409q74h.jpg" alt></p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9m4ttosudj307x0a7gls.jpg" alt></p>
+<p>然后重新Ctrl+F2载入，按Shift+F9一直跑，八次异常后，第九次程序跑了起来，这八次异常中，可能有去除硬断的函数</p>
+<p>随便选一个异常处理函数，在他开头下断点，先在第四个异常处理函数处下硬断</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9m5l8hagrj30co06nq30.jpg" alt></p>
+<p>然后Ctrl+F2，Shift+F9跑，到了第四次的时候，不是硬断命中，而是异常命中，说明在这时硬断已经被清除了</p>
+<p><img src="/2019/12/05/PESpin%E8%84%B1%E5%A3%B3/C:%5CUsers%5CAdministrator%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20191205211237175.png" alt></p>
+<p>然后分别在第二和第三处异常处理下硬断，发现硬断在第三处断下，第四处不断，说明第三处的异常处理函数清除了硬断</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtdske6bj3098023weg.jpg" alt></p>
+<p>在第三处  查看-&gt;SEH链</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtf0ih4cj30sc064aa8.jpg" alt></p>
+<p>在OD中不好看，DUMP出来放进IDA,直接F5</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mth5j68ij30fy0603yj.jpg" alt></p>
+<p>在结构体Structures中按Insert添加结构体，选择Add Standard Structure</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mti7h97xj30b106tglj.jpg" alt></p>
+<p>然后Ctrl+F搜索 CONTEXT，添加</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtj3rpx5j310906rmy1.jpg" alt></p>
+<p>选中变量a3,点击Convert to struct *，应用刚才的CONTEXT</p>
+<p><img src="/2019/12/05/PESpin%E8%84%B1%E5%A3%B3/C:%5CUsers%5CAdministrator%5CAppData%5CRoaming%5CTypora%5Ctypora-user-images%5Cimage-20191206110014553.png" alt></p>
+<p>可以发现代码将寄存器DR0-DR3清零，清除了硬断</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtkockdzj30ds0553ye.jpg" alt></p>
+<p>在OD中重新载入，ESP定律后，NOP清除硬断的这一段代码</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtopdmyrj313g0iegn8.jpg" alt></p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtp5h9zaj313k0gjwfe.jpg" alt></p>
+<p>然后继续Shift+F9跑完所有异常，会断在ESP定律的硬断</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtpsbbwrj314u0nr40h.jpg" alt></p>
+<p>这里单步向下，找到大跳，即OEP</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mtqmmvhcj313y0gomya.jpg" alt></p>
+<p>DUMP出来后，程序不能运行，因为还需要修复IAT</p>
+<p>找到OEP下的第一个call，在第一个call的位置下 硬件访问断点，找到修改IAT的地方</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9mzxr5e33j30oz0mlgn9.jpg" alt></p>
+<p>下断点之后，重新载入，然后Shift+F9跑起来，NOP掉清楚硬断的代码</p>
+<p>程序会在修改的IAT的地方断下，第一次断下，代码被混淆，按Ctrl+↑来看代码</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n07peoscj30ft029mx0.jpg" alt></p>
+<p>不是这个，接着Shift+F9，几次之后，按Ctrl+↑查看代码，找到修改IAT的地方</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n0j36vkaj30kp02hwec.jpg" alt></p>
+<p>这里有了修改IAT的地址，还需要找到原始IAT的地址，这里F7单步走</p>
+<p>最后在438F9F地址，得到IAT的原始地址</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n0rupm9vj31h00dbmyc.jpg" alt></p>
+<p>然后得到四个地址</p>
+<p>程序OEP：409486</p>
+<p>清除硬断：43AF59</p>
+<p>IAT原始地址：438F9F</p>
+<p>修改IAT表：43918C</p>
+<p>修复脚本</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n29dnhcpj30qi0klaau.jpg" alt></p>
+<p>修复完成后，查看IAT，需要修复一下</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n1t1vc2hj30so094dg0.jpg" alt></p>
+<p>使用UIF修复IAT</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n20j2m6xj30te0aa0tp.jpg" alt></p>
+<p>修复完成后的IAT</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n21jwvsyj30t509xab4.jpg" alt></p>
+<p>使用ImportREC修复转储到文件，不知道为啥Scylla转储后会报错</p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n25ysvn6j30jk0hd76f.jpg" alt></p>
+<p><img src="http://ww1.sinaimg.cn/large/006o5z8lgy1g9n27c581ej30gl05pwem.jpg" alt></p>
+<p>脚本代码:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line">// 初始化变量</span><br><span class="line"></span><br><span class="line"> // 临时变量，用来保存API地址</span><br><span class="line">MOV dwAPI,0 </span><br><span class="line"></span><br><span class="line">// 当EIP执行到这个地址的时候API放在EAX中 </span><br><span class="line">MOV dwGetProcAddr,00438F9F</span><br><span class="line"> </span><br><span class="line">// 当EIP执行到这个地址的时候IAT刚刚被填充为加密后的API地址</span><br><span class="line">MOV dwWriteIATAddr,0043918C</span><br><span class="line"></span><br><span class="line">MOV dwOEPAddr,00409486 // IEP执行到OEP就可以dump了</span><br><span class="line"></span><br><span class="line">MOV dwClear,0043AF59   //NOP清除硬断代码</span><br><span class="line"></span><br><span class="line">// 清除所有软件断点</span><br><span class="line">BC</span><br><span class="line"></span><br><span class="line">// 清除所有硬件断点</span><br><span class="line">BPHWCALL</span><br><span class="line"></span><br><span class="line">// 设置硬件执行断点</span><br><span class="line">BPHWS dwGetProcAddr,&quot;x&quot;</span><br><span class="line">BPHWS dwWriteIATAddr,&quot;x&quot;</span><br><span class="line">BPHWS dwOEPAddr,&quot;x&quot;</span><br><span class="line">BPHWS dwClear,&quot;x&quot;</span><br><span class="line"></span><br><span class="line">LOOP1:</span><br><span class="line">  RUN  </span><br><span class="line"></span><br><span class="line">CASE1:</span><br><span class="line">	CMP eip,dwClear</span><br><span class="line">	JNE CASE2</span><br><span class="line">	FILL dwClear,A,90    //Nop清除硬断代码</span><br><span class="line">CASE2:</span><br><span class="line">  CMP eip,dwGetProcAddr</span><br><span class="line">  JNE CASE3</span><br><span class="line">  MOV dwAPI,eax        //获得IAT原始地址</span><br><span class="line">  JMP LOOP1   </span><br><span class="line"></span><br><span class="line">CASE3:</span><br><span class="line">  CMP eip,dwWriteIATAddr  </span><br><span class="line">  JNE CASE4</span><br><span class="line">  MOV [edi],dwAPI      //将原始地址填充回IAT</span><br><span class="line">  JMP LOOP1     </span><br><span class="line"></span><br><span class="line">CASE4:</span><br><span class="line">  CMP eip,dwOEPAddr   </span><br><span class="line">  JNE LOOP1</span><br><span class="line">  MSG &quot;到达OEP，可以dump了！！！&quot;</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/12/05/PESpin%E8%84%B1%E5%A3%B3/" data-id="ck4fawyz5000lk0u69yay6h8w"
+         class="article-share-link">Share</a>
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/PESpin/" rel="tag">PESpin</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%84%B1%E5%A3%B3/" rel="tag">脱壳</a></li></ul>
+
+    </footer>
+
+  </div>
+
+  
+    
+  <nav class="article-nav">
+    
+      <a href="/2019/12/09/ASPack%E8%84%B1%E5%A3%B3-%E9%9A%8F%E6%9C%BA%E5%9F%BA%E5%9D%80/" class="article-nav-link">
+        <strong class="article-nav-caption">Newer posts</strong>
+        <div class="article-nav-title">
+          
+            ASPack脱壳 随机基址
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2019/12/03/%E5%AE%9E%E6%A8%A1%E5%BC%8F%E4%B8%8B%E7%9A%84%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F%E8%A1%A8-IVT/" class="article-nav-link">
+        <strong class="article-nav-caption">Olde posts</strong>
+        <div class="article-nav-title">实模式下的中断向量表(IVT)</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+    
+  
+
+</article>
+
+
+
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+</ul>
+    </div>
+    <ul class="list-inline">
+      <li>&copy; 2019 Y</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean">Ocean</a></li>
+    </ul>
+  </div>
+</footer>
+
+</main>
+
+<aside class="sidebar sidebar-specter">
+  
+    <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/hexo.svg" alt="Y"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">Home</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">Archives</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/gallery">Gallery</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">About</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="Search">
+        <i class="fe fe-search"></i>
+        Search
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+  </aside>
+  <script src="/js/jquery-2.0.3.min.js"></script>
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/lazyload.min.js"></script>
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+  <script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+  <script src="/js/tocbot.min.js"></script>
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+<script src="/js/ocean.js"></script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/hijiki.model.json"},"display":{"position":"left","width":150,"height":300},"mobile":{"show":true},"log":false});</script></body>
+</html>

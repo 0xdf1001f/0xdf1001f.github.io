@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+    <meta name="keywords" content="业余，逆向，C，脚本，病毒，摸鱼，划水，APT，漏洞，攻击">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    fs段 TEB PEB 常用偏移地址 |
+    
+    Y</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+    <link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+  
+  <script src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  
+
+<article id="post-fs段-TEB-PEB-常用偏移地址" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+  
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      fs段 TEB PEB 常用偏移地址
+    </h1>
+  
+  
+
+
+
+
+      </header>
+    
+
+    
+      <div class="article-meta">
+        <a href="/2019/11/12/fs%E6%AE%B5-TEB-PEB-%E5%B8%B8%E7%94%A8%E5%81%8F%E7%A7%BB%E5%9C%B0%E5%9D%80/" class="article-date">
+  <time datetime="2019-11-12T02:45:48.000Z" itemprop="datePublished">2019-11-12</time>
+</a>
+        
+      </div>
+    
+
+    
+      
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+        <h1 id="fs段-TEB-PEB-常用偏移地址"><a href="#fs段-TEB-PEB-常用偏移地址" class="headerlink" title="fs段 TEB PEB 常用偏移地址"></a>fs段 TEB PEB 常用偏移地址</h1><p>fs寄存器在Ring0中指向一个称为KPCR的数据结构，即FS段的起点与KPCR结构对齐。</p>
+<p>对于Ring3的应用程序，fs:[0]的地址指向的是<strong>TEB结构</strong>，这个结构的开头是一个NT_TIB结构，NT_TIB结构的0x18偏移处是一个Self指针，指向这个结构自身，也就是指向TEB结构的开头。<br>TEB结构的0x30偏移是一个指向PEB的指针。PEB又是一个结构，这个结构的0x2偏移处是一个UChar，名叫BeingDebugged，当进程被<strong>调试</strong>时，此值为1，未被调试时此值为0</p>
+<a id="more"></a>
+
+<h1 id="FS段"><a href="#FS段" class="headerlink" title="FS段"></a><font color="DeepSkyBlue">FS段</font></h1><p>mov eax, dword ptr fs:[0h]//SEH结构化异常处理地址</p>
+<p>mov eax, dword ptr fs:[18h]//TEB结构</p>
+<p>mov eax, dword ptr fs:[20h]//ClientId 客户端ID结构</p>
+<p>mov eax, dword ptr fs:[30h]//PEB结构</p>
+<p>mov eax, dword ptr fs:[1a8h]//激活上下文堆栈指针结构</p>
+<p>mov eax, dword ptr fs:[1d4h]//GDI线程环境快作业结构?</p>
+<p>mov eax, dword ptr fs:[6b4h]//RealClientId ID结构</p>
+<p>mov eax, dword ptr fs:[bf8h]//静态Unicode字符串</p>
+<p>mov eax, dword ptr fs:[f10h]//线程本地存储TLS</p>
+<p>mov eax, dword ptr fs:[f50h]//活动ID</p>
+<p>mov eax, dword ptr fs:[f74h]//CurrentIdealProcessor 当前处理器?</p>
+<p>mov eax, dword ptr fs:[fb0h]//ActiveFrame活动框架</p>
+<h1 id="TEB-线程环境块"><a href="#TEB-线程环境块" class="headerlink" title="TEB(线程环境块)"></a><font color="DeepSkyBlue">TEB(线程环境块)</font></h1><p>nt!_TEB</p>
+<p>+0x000 NtTib  : _NT_TIB</p>
+<p>+0x01c EnvironmentPointer : Ptr32 Void</p>
+<p>+0x020 ClientId  : _CLIENT_ID  //进程的pid</p>
+<p>+0x028 ActiveRpcHandle  : Ptr32 Void</p>
+<p>+0x02c ThreadLocalStoragePointer : Ptr32 Void</p>
+<p>+0x030 ProcessEnvironmentBlock : Ptr32 _PEB  //进程PEB</p>
+<p>+0x034 LastErrorValue  : Uint4B</p>
+<p>+0x038 CountOfOwnedCriticalSections : Uint4B</p>
+<p>+0x03c CsrClientThread  : Ptr32 Void</p>
+<p>+0x040 Win32ThreadInfo  : Ptr32 Void</p>
+<p>+0x044 User32Reserved  : [26] Uint4B</p>
+<p>+0x0ac UserReserved  : [5] Uint4B</p>
+<p>+0x0c0 WOW32Reserved  : Ptr32 Void</p>
+<p>+0x0c4 CurrentLocale  : Uint4B</p>
+<p>+0x0c8 FpSoftwareStatusRegister : Uint4B</p>
+<p>+0x0cc SystemReserved1  : [54] Ptr32 Void</p>
+<p>+0x1a4 ExceptionCode  : Int4B</p>
+<p>+0x1a8 ActivationContextStack : _ACTIVATION_CONTEXT_STACK</p>
+<p>+0x1bc SpareBytes1  : [24] UChar</p>
+<p>+0x1d4 GdiTebBatch  : _GDI_TEB_BATCH</p>
+<p>+0x6b4 RealClientId  : _CLIENT_ID</p>
+<p>+0x6bc GdiCachedProcessHandle : Ptr32 Void</p>
+<p>+0x6c0 GdiClientPID  : Uint4B</p>
+<p>+0x6c4 GdiClientTID  : Uint4B</p>
+<p>+0x6c8 GdiThreadLocalInfo : Ptr32 Void</p>
+<p>+0x6cc Win32ClientInfo  : [62] Uint4B</p>
+<p>+0x7c4 glDispatchTable  : [233] Ptr32 Void</p>
+<p>+0xb68 glReserved1  : [29] Uint4B</p>
+<p>+0xbdc glReserved2  : Ptr32 Void</p>
+<p>+0xbe0 glSectionInfo  : Ptr32 Void</p>
+<p>+0xbe4 glSection  : Ptr32 Void</p>
+<p>+0xbe8 glTable  : Ptr32 Void</p>
+<p>+0xbec glCurrentRC  : Ptr32 Void</p>
+<p>+0xbf0 glContext  : Ptr32 Void</p>
+<p>+0xbf4 LastStatusValue  : Uint4B</p>
+<p>+0xbf8 StaticUnicodeString : _UNICODE_STRING</p>
+<p>+0xc00 StaticUnicodeBuffer : [261] Uint2B</p>
+<p>+0xe0c DeallocationStack : Ptr32 Void</p>
+<p>+0xe10 TlsSlots  : [64] Ptr32 Void  //TLS值  是个数组[64]</p>
+<p>+0xf10 TlsLinks  : _LIST_ENTRY</p>
+<p>+0xf18 Vdm  : Ptr32 Void</p>
+<p>+0xf1c ReservedForNtRpc : Ptr32 Void</p>
+<p>+0xf20 DbgSsReserved  : [2] Ptr32 Void</p>
+<p>+0xf28 HardErrorsAreDisabled : Uint4B</p>
+<p>+0xf2c Instrumentation  : [16] Ptr32 Void</p>
+<p>+0xf6c WinSockData  : Ptr32 Void</p>
+<p>+0xf70 GdiBatchCount  : Uint4B</p>
+<p>+0xf74 InDbgPrint  : UChar</p>
+<p>+0xf75 FreeStackOnTermination : UChar</p>
+<p>+0xf76 HasFiberData  : UChar</p>
+<p>+0xf77 IdealProcessor  : UChar</p>
+<p>+0xf78 Spare3  : Uint4B</p>
+<p>+0xf7c ReservedForPerf  : Ptr32 Void</p>
+<p>+0xf80 ReservedForOle  : Ptr32 Void</p>
+<p>+0xf84 WaitingOnLoaderLock : Uint4B</p>
+<p>+0xf88 Wx86Thread  : _Wx86ThreadState</p>
+<p>+0xf94 TlsExpansionSlots : Ptr32 Ptr32 Void  //TLS扩展值  是个数组[Ptr32]</p>
+<p>+0xf98 ImpersonationLocale : Uint4B</p>
+<p>+0xf9c IsImpersonating  : Uint4B</p>
+<p>+0xfa0 NlsCache  : Ptr32 Void</p>
+<p>+0xfa4 pShimData  : Ptr32 Void</p>
+<p>+0xfa8 HeapVirtualAffinity : Uint4B</p>
+<p>+0xfac CurrentTransactionHandle : Ptr32 Void</p>
+<p>+0xfb0 ActiveFrame  : Ptr32 _TEB_ACTIVE_FRAME</p>
+<p>+0xfb4 SafeThunkCall  : UChar</p>
+<p>+0xfb5 BooleanSpare  : [3] UChar</p>
+<h2 id="PEB"><a href="#PEB" class="headerlink" title="PEB"></a><font color="DeepSkyBlue">PEB</font></h2><ol>
+<li>typedef struct _PEB</li>
+<li>{</li>
+<li>UCHAR InheritedAddressSpace; // 00h</li>
+<li>UCHAR ReadImageFileExecOptions; // 01h</li>
+<li>UCHAR BeingDebugged; // 02h</li>
+<li>UCHAR Spare; // 03h</li>
+<li>PVOID Mutant; // 04h</li>
+<li>PVOID ImageBaseAddress; // 08h</li>
+<li>PPEB_LDR_DATA Ldr; // 0Ch</li>
+<li>PRTL_USER_PROCESS_PARAMETERS ProcessParameters; // 10h</li>
+<li>PVOID SubSystemData; // 14h</li>
+<li>PVOID ProcessHeap; // 18h</li>
+<li>PVOID FastPebLock; // 1Ch</li>
+<li>PPEBLOCKROUTINE FastPebLockRoutine; // 20h</li>
+<li>PPEBLOCKROUTINE FastPebUnlockRoutine; // 24h</li>
+<li>ULONG EnvironmentUpdateCount; // 28h</li>
+<li>PVOID* KernelCallbackTable; // 2Ch</li>
+<li>PVOID EventLogSection; // 30h</li>
+<li>PVOID EventLog; // 34h</li>
+<li>PPEB_FREE_BLOCK FreeList; // 38h</li>
+<li>ULONG TlsExpansionCounter; // 3Ch</li>
+<li>PVOID TlsBitmap; // 40h</li>
+<li>ULONG TlsBitmapBits[0x2]; // 44h</li>
+<li>PVOID ReadOnlySharedMemoryBase; // 4Ch</li>
+<li>PVOID ReadOnlySharedMemoryHeap; // 50h</li>
+<li>PVOID* ReadOnlyStaticServerData; // 54h</li>
+<li>PVOID AnsiCodePageData; // 58h</li>
+<li>PVOID OemCodePageData; // 5Ch</li>
+<li>PVOID UnicodeCaseTableData; // 60h</li>
+<li>ULONG NumberOfProcessors; // 64h</li>
+<li>ULONG NtGlobalFlag; // 68h</li>
+<li>UCHAR Spare2[0x4]; // 6Ch</li>
+<li>LARGE_INTEGER CriticalSectionTimeout; // 70h</li>
+<li>ULONG HeapSegmentReserve; // 78h</li>
+<li>ULONG HeapSegmentCommit; // 7Ch</li>
+<li>ULONG HeapDeCommitTotalFreeThreshold; // 80h</li>
+<li>ULONG HeapDeCommitFreeBlockThreshold; // 84h</li>
+<li>ULONG NumberOfHeaps; // 88h</li>
+<li>ULONG MaximumNumberOfHeaps; // 8Ch</li>
+<li>PVOID** ProcessHeaps; // 90h</li>
+<li>PVOID GdiSharedHandleTable; // 94h</li>
+<li>PVOID ProcessStarterHelper; // 98h</li>
+<li>PVOID GdiDCAttributeList; // 9Ch</li>
+<li>PVOID LoaderLock; // A0h</li>
+<li>ULONG OSMajorVersion; // A4h</li>
+<li>ULONG OSMinorVersion; // A8h</li>
+<li>ULONG OSBuildNumber; // ACh</li>
+<li>ULONG OSPlatformId; // B0h</li>
+<li>ULONG ImageSubSystem; // B4h</li>
+<li>ULONG ImageSubSystemMajorVersion; // B8h</li>
+<li>ULONG ImageSubSystemMinorVersion; // C0h</li>
+<li>ULONG GdiHandleBuffer[0x22]; // C4h</li>
+<li>PVOID ProcessWindowStation; // ???</li>
+<li>} PEB, *PPEB;</li>
+</ol>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/11/12/fs%E6%AE%B5-TEB-PEB-%E5%B8%B8%E7%94%A8%E5%81%8F%E7%A7%BB%E5%9C%B0%E5%9D%80/" data-id="ck4fawz0u003bk0u64igahuts"
+         class="article-share-link">Share</a>
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/PE%E7%BB%93%E6%9E%84/" rel="tag">PE结构</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%9C%B0%E5%9D%80/" rel="tag">地址</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%84%E5%AD%98%E5%99%A8/" rel="tag">寄存器</a></li></ul>
+
+    </footer>
+
+  </div>
+
+  
+    
+  <nav class="article-nav">
+    
+      <a href="/2019/11/12/SID/" class="article-nav-link">
+        <strong class="article-nav-caption">Newer posts</strong>
+        <div class="article-nav-title">
+          
+            SID
+          
+        </div>
+      </a>
+    
+    
+  </nav>
+
+
+  
+
+  
+    
+  
+
+</article>
+
+
+
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+</ul>
+    </div>
+    <ul class="list-inline">
+      <li>&copy; 2019 Y</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean">Ocean</a></li>
+    </ul>
+  </div>
+</footer>
+
+</main>
+
+<aside class="sidebar sidebar-specter">
+  
+    <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/hexo.svg" alt="Y"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">Home</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">Archives</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/gallery">Gallery</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">About</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="Search">
+        <i class="fe fe-search"></i>
+        Search
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+  </aside>
+  <script src="/js/jquery-2.0.3.min.js"></script>
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/lazyload.min.js"></script>
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+  <script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+  <script src="/js/tocbot.min.js"></script>
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+<script src="/js/ocean.js"></script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/hijiki.model.json"},"display":{"position":"left","width":150,"height":300},"mobile":{"show":true},"log":false});</script></body>
+</html>

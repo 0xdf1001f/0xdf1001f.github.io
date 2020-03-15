@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+    <meta name="keywords" content="业余，逆向，C，脚本，病毒，摸鱼，划水，APT，漏洞，攻击">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    实模式下的中断向量表(IVT) |
+    
+    Y</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+    <link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+  
+  <script src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  
+
+<article id="post-实模式下的中断向量表-IVT" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+  
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      实模式下的中断向量表(IVT)
+    </h1>
+  
+  
+
+
+
+
+      </header>
+    
+
+    
+      <div class="article-meta">
+        <a href="/2019/12/03/%E5%AE%9E%E6%A8%A1%E5%BC%8F%E4%B8%8B%E7%9A%84%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F%E8%A1%A8-IVT/" class="article-date">
+  <time datetime="2019-12-03T02:24:57.000Z" itemprop="datePublished">2019-12-03</time>
+</a>
+        
+      </div>
+    
+
+    
+      
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+        <h3 id="实模式、保护模式简介"><a href="#实模式、保护模式简介" class="headerlink" title="实模式、保护模式简介"></a>实模式、保护模式简介</h3><p> <strong>1. 实模式(Real-address Mode）</strong></p>
+<p>实地址模式简称为实模式（Real Mode），即模拟8086处理器的工作模式。工作在次模式下的IA-32处理器相当于高速的8086处理器。实模式提供了一种简单的单任务环境，可以直接访问无力内存和I/O空间，操作系统和应用软件运行在同一个内存空间中和同一个优先级上，因此操作系统的数据很容易被应用软件所破坏。DOS操作系统就运行在实模式下。CPU在上电或复位后总是处于实模式状态。即BIOS程序也工作在实模式下。 </p>
+<a id="more"></a>
+
+<p> <strong>2.</strong> <strong>保护模式（Protected*Mode）</strong></p>
+<p>保护模式具有强大的虚拟内存支持和完善的任务保护机制，它为现代操作系统提供了良好的多任务运行环境。其“保护”的含义就是保护多任务环境中的各个任务的安全。在保护方式下，全部32条地址线有效，可寻址高达4G字节的物理地址空间；扩充的存储器分段管理机制和可选的存储器分页管理机制，不仅为存储器共享和保护提供了硬件支持，而且为实现虚拟存储器提供了硬件支持；支持多任务，能够快速地进行任务切换和保护任务环境；4个特权级和完善的特权检查机制，既能实现资源共享又能保证代码和数据的安全和保密及任务的隔离；支持虚拟8086方式，便于执行8086程序。如Windows、Linux操作系统就工作在这个模式下</p>
+<h3 id="实模式下的IVT（Interrupt-Vector-Table）"><a href="#实模式下的IVT（Interrupt-Vector-Table）" class="headerlink" title="实模式下的IVT（Interrupt Vector Table）"></a>实模式下的IVT（Interrupt Vector Table）</h3><p> IVT（Interrupt Vector Table）即中断向量表。CPU在执行指令时因为检测到预先定义的某个（或多个）条件而产生的同步事件（如除法指令的除零错误），大部分书籍称之为内中断。CPU收到中断信息后，需要对中断信息进行处理，而用来处理中断信息的程序称为中断处理程序。所谓中断向量就是中断处理程序的入口地址，而中断向量表（IVT）就是中断处理程序入口地址的列表。</p>
+<p>IA-32架构规定，在实模式（Real Mode）下，IVT在内存中保存，起始地址为0。从内存0000:0000到0000:03FF的1024个内存单元中存放着中断向量表（IVT)。 </p>
+<p> 中断调用采用int n的形式，n 代表中断向量号（n=1，2，3……）。这样通过n<em>4这样的计算，可以迅速定位到各个中断号对应的内存地址。n</em>4+2存放的是中断向量的段地址，n*4存放的是中断向量的偏移地址（实模式下的汇编程序设计请参考文献）。这样IVT的1024个内存单元总共可以存放256个中断向量。 </p>
+<p>对于中断过程的执行步骤，过程如下：</p>
+<ol>
+<li>将代码段寄存器CS和指令指针寄存器（EIP）的低16位（IP）压入堆栈。</li>
+<li>将标志寄存器EFLAGS的低16位（FLAGS）压入堆栈。</li>
+<li>清楚标志寄存器的IF标志，以禁止其他中断。</li>
+<li>清楚标志寄存器的TF（Trap Flag）、RF（Resume Flag）、AC（Alignment Check）标志。</li>
+<li>使用向量号n作为索引，在IVT中找到对应的表项（n*4+IVT表基地址）。</li>
+<li>将表项中的段地址和偏移地址分别装入CS和IP寄存器中，并开始执行对应的代码。</li>
+<li>中断例程总是以IRET指令结束。IRET指令会从堆栈中弹出前面保存的CS、IP和标志寄存器值，然后返回执行被中断的程序。</li>
+</ol>
+<p>如果在第6个步骤，修改IVT表中向量号对应的表项,把我们自行设计的程序所在的段地址和偏移地址装入CS和IP寄存器中，CPU将会运行我们的程序。这就是IVT Hook的理论基础。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/12/03/%E5%AE%9E%E6%A8%A1%E5%BC%8F%E4%B8%8B%E7%9A%84%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F%E8%A1%A8-IVT/" data-id="ck4fawz0m0032k0u6560egzxu"
+         class="article-share-link">Share</a>
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/HOOK/" rel="tag">HOOK</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/IVT/" rel="tag">IVT</a></li></ul>
+
+    </footer>
+
+  </div>
+
+  
+    
+  <nav class="article-nav">
+    
+      <a href="/2019/12/05/PESpin%E8%84%B1%E5%A3%B3/" class="article-nav-link">
+        <strong class="article-nav-caption">Newer posts</strong>
+        <div class="article-nav-title">
+          
+            PESpin脱壳
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2019/11/19/%E5%82%80%E5%84%A1%E8%BF%9B%E7%A8%8B/" class="article-nav-link">
+        <strong class="article-nav-caption">Olde posts</strong>
+        <div class="article-nav-title">傀儡进程</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+    
+  
+
+</article>
+
+
+
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+</ul>
+    </div>
+    <ul class="list-inline">
+      <li>&copy; 2019 Y</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean">Ocean</a></li>
+    </ul>
+  </div>
+</footer>
+
+</main>
+
+<aside class="sidebar sidebar-specter">
+  
+    <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/hexo.svg" alt="Y"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">Home</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">Archives</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/gallery">Gallery</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">About</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="Search">
+        <i class="fe fe-search"></i>
+        Search
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+  </aside>
+  <script src="/js/jquery-2.0.3.min.js"></script>
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/lazyload.min.js"></script>
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+  <script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+  <script src="/js/tocbot.min.js"></script>
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+<script src="/js/ocean.js"></script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/hijiki.model.json"},"display":{"position":"left","width":150,"height":300},"mobile":{"show":true},"log":false});</script></body>
+</html>

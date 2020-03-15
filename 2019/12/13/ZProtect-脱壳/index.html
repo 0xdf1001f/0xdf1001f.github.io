@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  
+  
+    <meta name="keywords" content="业余，逆向，C，脚本，病毒，摸鱼，划水，APT，漏洞，攻击">
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>
+    ZProtect 脱壳 |
+    
+    Y</title>
+  
+    <link rel="shortcut icon" href="/favicon.ico">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+    <link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+  
+  <script src="/js/pace.min.js"></script>
+</head>
+
+<body>
+<main class="content">
+  <section class="outer">
+  
+
+<article id="post-ZProtect-脱壳" class="article article-type-post" itemscope itemprop="blogPost" data-scroll-reveal>
+  
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      ZProtect 脱壳
+    </h1>
+  
+  
+
+
+
+
+      </header>
+    
+
+    
+      <div class="article-meta">
+        <a href="/2019/12/13/ZProtect-%E8%84%B1%E5%A3%B3/" class="article-date">
+  <time datetime="2019-12-13T02:30:48.000Z" itemprop="datePublished">2019-12-13</time>
+</a>
+        
+      </div>
+    
+
+    
+      
+
+
+
+
+    
+
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+        <p>查壳, ZPotect 1.4.9</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwapy86uj20g809mwf2.jpg" alt></p>
+<a id="more"></a>
+
+<p>拉进OD，F7单步，到push ad ESP定律下断，断下后单步几次，来到OEP</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwc2hqfwj213k0he0ug.jpg" alt></p>
+<p>记住OEP的地址4011A0</p>
+<p>然后Ctrl+B，查找FF 15 或者FF 25，查找到一个CALL</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwf4rpd1j20aa057glj.jpg" alt></p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwfdbapmj212y064t8x.jpg" alt></p>
+<p>回车进入CALL，长这样</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwfsy1jrj213j0ejdgv.jpg" alt></p>
+<p>跟随第二行的jmp，到达后再回车进jmp</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwgwqogmj213505swen.jpg" alt></p>
+<p>到达后长这样</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwhh2c4pj213j04ejrf.jpg" alt></p>
+<p>回车跟进这个CALL</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwi1owhzj213i0foab4.jpg" alt></p>
+<p>找到ExitProcss下面的call，复制出来，记住CALL  []内的地址  0x32652C</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwj1475xj20ob04rwek.jpg" alt></p>
+<p>然后Shift+*，回到EIP的位置，用ImportREC附加进程，查找IAT表，记下IAT的Start和End地址</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwkvo2g8j20id0bwt97.jpg" alt></p>
+<p>现在一共四个地址</p>
+<p>OEP  0x4011A0 </p>
+<p>CALL [0x32652C]    </p>
+<p>IAT Start 408000</p>
+<p>IAT End 4080E4     (这里在脚本中应该多写4字节，否则最后一个函数获取不到，所以应该写4080E8)</p>
+<p>脚本代码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">B8 00 80 40 00 8B 18 83 FB 00 74 36 80 3B 68 75 40 8B 4B 01 50 51 FF 15 2C 65 21 00 8B F0 A1 64</span><br><span class="line">6C 21 00 2B 05 60 6C 21 00 C1 F8 02 3B F0 72 05 E8 E9 6A 8E FF A1 60 6C 21 00 8B 04 B0 5F 57 89</span><br><span class="line">07 58 83 C0 04 3D E8 80 40 00 72 B9 E9 35 4C FF FF 66 81 3B 50 60 75 EA 80 7B 02 68 75 E4 8B 4B</span><br><span class="line">03 EB B1</span><br></pre></td></tr></table></figure>
+
+<p>在OEP往下拉，找到一片空白位置，写脚本</p>
+<p>二进制粘贴</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwopqmnoj20t60a00ti.jpg" alt></p>
+<p>粘贴好有时候第一行代码会变成</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">add byte ptr ds:[eax+0x408000],bh</span><br></pre></td></tr></table></figure>
+
+<p>选中按下Ctrl+↑即可</p>
+<p>粘贴后代码</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9uwqkigavj21360e7dgo.jpg" alt></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">0040B9B0    B8 00804000     mov eax,HelloWor.00408000                ; IAT Start</span><br><span class="line">0040B9B5    8B18            mov ebx,dword ptr ds:[eax]</span><br><span class="line">0040B9B7    83FB 00         cmp ebx,0x0</span><br><span class="line">0040B9BA    74 36           je short HelloWor.0040B9F2</span><br><span class="line">0040B9BC    803B 68         cmp byte ptr ds:[ebx],0x68</span><br><span class="line">0040B9BF    75 40           jnz short HelloWor.0040BA01</span><br><span class="line">0040B9C1    8B4B 01         mov ecx,dword ptr ds:[ebx+0x1]</span><br><span class="line">0040B9C4    50              push eax                                 ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9C5    51              push ecx</span><br><span class="line">0040B9C6    FF15 2C652100   call dword ptr ds:[0x21652C];修改前几位不同位数，与CALL[]内地址相同</span><br><span class="line">0040B9CC    8BF0            mov esi,eax                              ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9CE    A1 646C2100     mov eax,dword ptr ds:[0x216C64];修改前几位</span><br><span class="line">0040B9D3    2B05 606C2100   sub eax,dword ptr ds:[0x216C60];修改前几位</span><br><span class="line">0040B9D9    C1F8 02         sar eax,0x2</span><br><span class="line">0040B9DC    3BF0            cmp esi,eax                              ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9DE    72 05           jb short HelloWor.0040B9E5</span><br><span class="line">0040B9E0    E8 E96A8EFF     call FFCF24CE</span><br><span class="line">0040B9E5    A1 606C2100     mov eax,dword ptr ds:[0x216C60];修改前几位</span><br><span class="line">0040B9EA    8B04B0          mov eax,dword ptr ds:[eax+esi*4]</span><br><span class="line">0040B9ED    5F              pop edi                                  ; kernel32.775FED6C</span><br><span class="line">0040B9EE    57              push edi</span><br><span class="line">0040B9EF    8907            mov dword ptr ds:[edi],eax               ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9F1    58              pop eax                                  ; kernel32.775FED6C</span><br><span class="line">0040B9F2    83C0 04         add eax,0x4</span><br><span class="line">0040B9F5    3D E8804000     cmp eax,HelloWor.004080E8                ; IAT End</span><br><span class="line">0040B9FA  ^ 72 B9           jb short HelloWor.0040B9B5</span><br><span class="line">0040B9FC  ^ E9 9F57FFFF     jmp HelloWor.004011A0                    ; JMP OEP</span><br><span class="line">0040BA01    66:813B 5060    cmp word ptr ds:[ebx],0x6050</span><br><span class="line">0040BA06  ^ 75 EA           jnz short HelloWor.0040B9F2</span><br><span class="line">0040BA08    807B 02 68      cmp byte ptr ds:[ebx+0x2],0x68</span><br><span class="line">0040BA0C  ^ 75 E4           jnz short HelloWor.0040B9F2</span><br><span class="line">0040BA0E    8B4B 03         mov ecx,dword ptr ds:[ebx+0x3]</span><br><span class="line">0040BA11  ^ EB B1           jmp short HelloWor.0040B9C4</span><br></pre></td></tr></table></figure>
+
+<p>如何修改CALL []地址</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9C5    51              push ecx</span><br><span class="line">0040B9C6    FF15 2C652100   call dword ptr ds:[0x21652C];修改前几位不同位数，与CALL[]内地址相同</span><br><span class="line">0040B9CC    8BF0            mov esi,eax                              ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9CE    A1 646C2100     mov eax,dword ptr ds:[0x216C64];修改前几位</span><br><span class="line">0040B9D3    2B05 606C2100   sub eax,dword ptr ds:[0x216C60];修改前几位</span><br><span class="line">0040B9D9    C1F8 02         sar eax,0x2</span><br><span class="line">0040B9DC    3BF0            cmp esi,eax                              ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9DE    72 05           jb short HelloWor.0040B9E5</span><br><span class="line">0040B9E0    E8 E96A8EFF     call FFCF24CE</span><br><span class="line">0040B9E5    A1 606C2100     mov eax,dword ptr ds:[0x216C60];修改前几位</span><br></pre></td></tr></table></figure>
+
+
+
+<p>比如40B9C6处为 CALL  [0X21652C]，而前面跟随CALL获取到的为CALL [0x32652C]   </p>
+<p>只有前2位不同，所以只需将 [0X21652C]中的21改为32</p>
+<p>然后将后面注释为“修改前几位”的数据，都将21修改为32，后面的数据不变</p>
+<p>修改后</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">0040B9C6    FF15 2C653200   call dword ptr ds:[0x32652C]</span><br><span class="line">0040B9CC    8BF0            mov esi,eax                              ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9CE    A1 646C3200     mov eax,dword ptr ds:[0x326C64]</span><br><span class="line">0040B9D3    2B05 606C3200   sub eax,dword ptr ds:[0x326C60]</span><br><span class="line">0040B9D9    C1F8 02         sar eax,0x2</span><br><span class="line">0040B9DC    3BF0            cmp esi,eax                              ; kernel32.BaseThreadInitThunk</span><br><span class="line">0040B9DE    72 05           jb short HelloWor.0040B9E5</span><br><span class="line">0040B9E0    E8 E96A8EFF     call FFCF24CE</span><br><span class="line">0040B9E5    A1 606C3200     mov eax,dword ptr ds:[0x326C60]</span><br></pre></td></tr></table></figure>
+
+<p>修改完成后，在脚本第一行新建EIP，取消ESP硬断</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9ux0rb96jj213709ddgb.jpg" alt></p>
+<p>在OEP处下断点，然后F9运行，断在OEP</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9ux2qimtxj213g0ae3z6.jpg" alt></p>
+<p>DUMP，ImportREC修复转储</p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9ux43ln7vj20iv0h2gnl.jpg" alt></p>
+<p><img src="http://ww1.sinaimg.cn/large/83ccc6a5gy1g9ux4jd3bqj20fu0990tb.jpg" alt></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2019/12/13/ZProtect-%E8%84%B1%E5%A3%B3/" data-id="ck4fawyzf000yk0u60bwjaqs1"
+         class="article-share-link">Share</a>
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/ZProtect/" rel="tag">ZProtect</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%84%B1%E5%A3%B3/" rel="tag">脱壳</a></li></ul>
+
+    </footer>
+
+  </div>
+
+  
+    
+  <nav class="article-nav">
+    
+      <a href="/2019/12/17/ShadowsocksR/" class="article-nav-link">
+        <strong class="article-nav-caption">Newer posts</strong>
+        <div class="article-nav-title">
+          
+            ShadowsocksR
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2019/12/12/ezip-%E8%84%B1%E5%A3%B3/" class="article-nav-link">
+        <strong class="article-nav-caption">Olde posts</strong>
+        <div class="article-nav-title">ezip 脱壳</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+    
+  
+
+</article>
+
+
+
+</section>
+  <footer class="footer">
+  <div class="outer">
+    <div class="float-right">
+      <ul class="list-inline">
+  
+    <li><i class="fe fe-smile-alt"></i> <span id="busuanzi_value_site_uv"></span></li>
+  
+</ul>
+    </div>
+    <ul class="list-inline">
+      <li>&copy; 2019 Y</li>
+      <li>Powered by <a href="http://hexo.io/" target="_blank">Hexo</a></li>
+      <li>Theme  <a href="https://github.com/zhwangart/hexo-theme-ocean">Ocean</a></li>
+    </ul>
+  </div>
+</footer>
+
+</main>
+
+<aside class="sidebar sidebar-specter">
+  
+    <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+    <div class="logo">
+      <a href="/"><img src="/images/hexo.svg" alt="Y"></a>
+    </div>
+  
+  <ul class="nav nav-main">
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/">Home</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/archives">Archives</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/gallery">Gallery</a>
+      </li>
+    
+      <li class="nav-item">
+        <a class="nav-item-link" href="/about">About</a>
+      </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link nav-item-search" title="Search">
+        <i class="fe fe-search"></i>
+        Search
+      </a>
+    </li>
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      <div class="totop" id="totop">
+  <i class="fe fe-rocket"></i>
+</div>
+    </li>
+    <li class="nav-item">
+      
+        <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+          <i class="fe fe-feed"></i>
+        </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+  </aside>
+  <script src="/js/jquery-2.0.3.min.js"></script>
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+<script src="/js/lazyload.min.js"></script>
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+  <script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+  <script src="/js/tocbot.min.js"></script>
+  <script>
+    // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+    tocbot.init({
+      tocSelector: '.tocbot',
+      contentSelector: '.article-entry',
+      headingSelector: 'h1, h2, h3, h4, h5, h6',
+      hasInnerContainers: true,
+      scrollSmooth: true,
+      positionFixedSelector: '.tocbot',
+      positionFixedClass: 'is-position-fixed',
+      fixedSidebarOffset: 'auto',
+    });
+  </script>
+
+
+<script src="/js/ocean.js"></script>
+
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/hijiki.model.json"},"display":{"position":"left","width":150,"height":300},"mobile":{"show":true},"log":false});</script></body>
+</html>
