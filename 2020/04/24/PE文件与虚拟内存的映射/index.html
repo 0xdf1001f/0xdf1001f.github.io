@@ -82,7 +82,7 @@ function activateLightMode(){
 <p>​    相对虚拟地址是内存地址相对于基址的偏移量，RVA=VA-Image Base</p>
 <h2 id="文件数据存放单位与内存数据存放单位的差异："><a href="#文件数据存放单位与内存数据存放单位的差异：" class="headerlink" title="文件数据存放单位与内存数据存放单位的差异："></a><strong>文件数据存放单位与内存数据存放单位的差异：</strong></h2><p>1.PE文件中的数据按照磁盘数据标准存放，以0x200字节为基本单位进行组织，当一个节（Section）不足0x200大小时，不足的地方将被0x00填充，当一个节大于0x200字节时，将把下一块0x200分配给这个节使用。因此PE数据节的大小永远是0x200的倍数。</p>
 <p>2.当代码装入内存后，按照内存数据标准存放，以0x10000字节为基本单位进行组织。同理不足将补全，大于则分配下一个0x1000空间。因为，内存中的节总是0x1000的倍数。</p>
-<p><a href="http://ww1.sinaimg.cn/large/006o5z8lgy1ge58ptzzmlj30qe05ddg8.jpg" target="_blank" rel="noopener" data-fancybox="group" data-caption class="fancybox"><img alt title data-src="http://ww1.sinaimg.cn/large/006o5z8lgy1ge58ptzzmlj30qe05ddg8.jpg" class="lazyload"></a></p>
+<p><a href="http://ww1.sinaimg.cn/large/006o5z8lgy1ge58ptzzmlj30qe05ddg8.jpg" target="_blank" rel="noopener" data-fancybox="group" data-caption class="fancybox"><img alt data-src="http://ww1.sinaimg.cn/large/006o5z8lgy1ge58ptzzmlj30qe05ddg8.jpg" class="lazyload" title></a></p>
 <p>由于内存中的数据节相对于装载基址的偏移量和文件中数据解的偏移量有差异，所以进行文件偏移到虚拟内存地址之间的换算时，还要看所转换的地址位于第几个节内。</p>
 <p>这种由存储单位差异引起的节基址差叫做<strong>节偏移</strong>，上图中：</p>
 <p>​    节偏移 = RVA - PointerToRawData（文件偏移量）</p>
